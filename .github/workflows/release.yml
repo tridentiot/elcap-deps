@@ -1,0 +1,80 @@
+name: Release Dependencies
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Get short SHA
+      id: vars
+      run: echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+
+    - name: Create Windows artifact
+      run: |
+        cd windows
+        zip -r ../elcap-deps-windows-${{ steps.vars.outputs.short_sha }}.zip .
+        cd ..
+
+    - name: Create Linux artifact
+      run: |
+        cd linux
+        tar -czf ../elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz .
+        cd ..
+
+    - name: Create MacOS artifact
+      run: |
+        cd macos
+        zip -r ../elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip .
+        cd ..
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: release-${{ steps.vars.outputs.short_sha }}
+        release_name: Release ${{ steps.vars.outputs.short_sha }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./elcap-deps-windows-${{ steps.vars.outputs.short_sha }}.zip
+        asset_name: elcap-deps-windows-${{ steps.vars.outputs.short_sha }}.zip
+        asset_content_type: application/zip
+
+    - name: Upload Linux Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz
+        asset_name: elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz
+        asset_content_type: application/gzip
+
+    - name: Upload MacOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip
+        asset_name: elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip
+        asset_content_type: application/zip
