@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -19,6 +19,22 @@ jobs:
     - name: Get short SHA
       id: vars
       run: echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+
+    - name: Set executable permissions for all platforms
+      run: |
+        # Set executable permissions for Windows binaries and libraries
+        find windows -type f \( -name "*.exe" -o -name "*.dll" \) -exec chmod +x {} \; || true
+
+        # Set executable permissions for Linux binaries and shared libraries
+        find linux -type f -executable -exec chmod +x {} \; || true
+        find linux -type f -name "*.so" -exec chmod +x {} \; || true
+        find linux -type f -name "*.so.*" -exec chmod +x {} \; || true
+        find linux -type f \( -name "*" ! -name "*.*" \) -exec chmod +x {} \; || true
+
+        # Set executable permissions for macOS binaries and shared libraries
+        find macos -type f -executable -exec chmod +x {} \; || true
+        find macos -type f -name "*.dylib" -exec chmod +x {} \; || true
+        find macos -type f \( -name "*" ! -name "*.*" \) -exec chmod +x {} \; || true
 
     - name: Create Windows artifact
       run: |
@@ -29,13 +45,15 @@ jobs:
     - name: Create Linux artifact
       run: |
         cd linux
-        tar -czf ../elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz .
+        # Use tar with preserve permissions flag
+        tar -czf ../elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz --preserve-permissions .
         cd ..
 
     - name: Create MacOS artifact
       run: |
         cd macos
-        zip -r ../elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip .
+        # Use zip with preserve Unix attributes/permissions
+        zip -r -X ../elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip .
         cd ..
 
     - name: Create and upload release
