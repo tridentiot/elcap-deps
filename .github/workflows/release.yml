@@ -7,7 +7,62 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
+  build-artifacts:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos
+            extension: "zip"
+          - os: ubuntu-latest
+            platform: linux
+            extension: "tar.gz"
+          - os: windows-latest
+            platform: windows
+            extension: "zip"
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Get short SHA
+      id: vars
+      run: echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Create macOS artifact
+      if: runner.os == 'macOS'
+      run: |
+        cd ${{ matrix.platform }}
+        ditto -c -k --rsrc --extattr . ../elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip
+        cd ..
+
+    - name: Create Linux artifact
+      if: runner.os == 'Linux'
+      run: |
+        cd ${{ matrix.platform }}
+        tar -czf ../elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz --preserve-permissions .
+        cd ..
+
+    - name: Create Windows artifact
+      if: runner.os == 'Windows'
+      run: |
+        cd ${{ matrix.platform }}
+        Compress-Archive -Path * -DestinationPath ../elcap-deps-windows-${{ steps.vars.outputs.short_sha }}.zip
+        cd ..
+      shell: pwsh
+
+    - name: Upload artifact to workflow
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.platform }}-deps-${{ steps.vars.outputs.short_sha }}
+        path: ./elcap-deps-${{ matrix.platform }}-${{ steps.vars.outputs.short_sha }}.${{ matrix.extension }}
+        retention-days: 1
+
+  create-release:
+    needs: build-artifacts
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,41 +75,16 @@ jobs:
       id: vars
       run: echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
 
-    - name: Set executable permissions for all platforms
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+        merge-multiple: true
+
+    - name: List downloaded files (debug)
       run: |
-        # Set executable permissions for Windows binaries and libraries
-        find windows -type f \( -name "*.exe" -o -name "*.dll" \) -exec chmod +x {} \; || true
-
-        # Set executable permissions for Linux binaries and shared libraries
-        find linux -type f -executable -exec chmod +x {} \; || true
-        find linux -type f -name "*.so" -exec chmod +x {} \; || true
-        find linux -type f -name "*.so.*" -exec chmod +x {} \; || true
-        find linux -type f \( -name "*" ! -name "*.*" \) -exec chmod +x {} \; || true
-
-        # Set executable permissions for macOS binaries and shared libraries
-        find macos -type f -executable -exec chmod +x {} \; || true
-        find macos -type f -name "*.dylib" -exec chmod +x {} \; || true
-        find macos -type f \( -name "*" ! -name "*.*" \) -exec chmod +x {} \; || true
-
-    - name: Create Windows artifact
-      run: |
-        cd windows
-        zip -r ../elcap-deps-windows-${{ steps.vars.outputs.short_sha }}.zip .
-        cd ..
-
-    - name: Create Linux artifact
-      run: |
-        cd linux
-        # Use tar with preserve permissions flag
-        tar -czf ../elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz --preserve-permissions .
-        cd ..
-
-    - name: Create MacOS artifact
-      run: |
-        cd macos
-        # Use zip with preserve Unix attributes/permissions
-        zip -r -X ../elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip .
-        cd ..
+        echo "Downloaded artifacts:"
+        find ./artifacts -type f -name "elcap-deps-*" | sort
 
     - name: Create and upload release
       uses: softprops/action-gh-release@v2.3.2
@@ -64,9 +94,9 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          ./elcap-deps-windows-${{ steps.vars.outputs.short_sha }}.zip
-          ./elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz
-          ./elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip
+          ./artifacts/elcap-deps-windows-${{ steps.vars.outputs.short_sha }}.zip
+          ./artifacts/elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz
+          ./artifacts/elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip
         fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
