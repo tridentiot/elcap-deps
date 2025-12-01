@@ -39,6 +39,14 @@ jobs:
         ditto -c -k --rsrc --extattr . ../elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip
         cd ..
 
+    - name: Set execute permissions on Linux JLink binaries
+      if: runner.os == 'Linux'
+      run: |
+        chmod +x ${{ matrix.platform }}/jlink/x86_64/JLinkExe
+        chmod +x ${{ matrix.platform }}/jlink/x86_64/libjlinkarm.so
+        chmod +x ${{ matrix.platform }}/jlink/arm64/JLinkExe
+        chmod +x ${{ matrix.platform }}/jlink/arm64/libjlinkarm.so
+
     - name: Create Linux artifact
       if: runner.os == 'Linux'
       run: |
