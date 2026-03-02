@@ -27,46 +27,44 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Get short SHA
+    - name: Get version
       id: vars
-      run: echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+      run: echo "version=$(cat __version__)" >> $GITHUB_OUTPUT
       shell: bash
 
     - name: Create macOS artifact
       if: runner.os == 'macOS'
       run: |
         cd ${{ matrix.platform }}
-        ditto -c -k --rsrc --extattr . ../elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip
+        ditto -c -k --rsrc --extattr . ../elcap-deps-macos-${{ steps.vars.outputs.version }}.zip
         cd ..
 
     - name: Set execute permissions on Linux JLink binaries
       if: runner.os == 'Linux'
       run: |
-        chmod +x ${{ matrix.platform }}/jlink/x86_64/JLinkExe
         chmod +x ${{ matrix.platform }}/jlink/x86_64/libjlinkarm.so
-        chmod +x ${{ matrix.platform }}/jlink/arm64/JLinkExe
         chmod +x ${{ matrix.platform }}/jlink/arm64/libjlinkarm.so
 
     - name: Create Linux artifact
       if: runner.os == 'Linux'
       run: |
         cd ${{ matrix.platform }}
-        tar -czf ../elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz --preserve-permissions .
+        tar -czf ../elcap-deps-linux-${{ steps.vars.outputs.version }}.tar.gz --preserve-permissions .
         cd ..
 
     - name: Create Windows artifact
       if: runner.os == 'Windows'
       run: |
         cd ${{ matrix.platform }}
-        Compress-Archive -Path * -DestinationPath ../elcap-deps-windows-${{ steps.vars.outputs.short_sha }}.zip
+        Compress-Archive -Path * -DestinationPath ../elcap-deps-windows-${{ steps.vars.outputs.version }}.zip
         cd ..
       shell: pwsh
 
     - name: Upload artifact to workflow
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.platform }}-deps-${{ steps.vars.outputs.short_sha }}
-        path: ./elcap-deps-${{ matrix.platform }}-${{ steps.vars.outputs.short_sha }}.${{ matrix.extension }}
+        name: ${{ matrix.platform }}-deps-${{ steps.vars.outputs.version }}
+        path: ./elcap-deps-${{ matrix.platform }}-${{ steps.vars.outputs.version }}.${{ matrix.extension }}
         retention-days: 1
 
   create-release:
@@ -79,9 +77,9 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Get short SHA
+    - name: Get version
       id: vars
-      run: echo "short_sha=${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+      run: echo "version=$(cat __version__)" >> $GITHUB_OUTPUT
 
     - name: Download all artifacts
       uses: actions/download-artifact@v4
@@ -97,14 +95,14 @@ jobs:
     - name: Create and upload release
       uses: softprops/action-gh-release@v2.3.2
       with:
-        tag_name: release-${{ steps.vars.outputs.short_sha }}
-        name: elcap-deps-${{ steps.vars.outputs.short_sha }}
+        tag_name: v${{ steps.vars.outputs.version }}
+        name: v${{ steps.vars.outputs.version }}
         draft: false
         prerelease: false
         files: |
-          ./artifacts/elcap-deps-windows-${{ steps.vars.outputs.short_sha }}.zip
-          ./artifacts/elcap-deps-linux-${{ steps.vars.outputs.short_sha }}.tar.gz
-          ./artifacts/elcap-deps-macos-${{ steps.vars.outputs.short_sha }}.zip
+          ./artifacts/elcap-deps-windows-${{ steps.vars.outputs.version }}.zip
+          ./artifacts/elcap-deps-linux-${{ steps.vars.outputs.version }}.tar.gz
+          ./artifacts/elcap-deps-macos-${{ steps.vars.outputs.version }}.zip
         fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
