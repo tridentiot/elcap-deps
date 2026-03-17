@@ -56,7 +56,7 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         cd ${{ matrix.platform }}
-        Compress-Archive -Path * -DestinationPath ../elcap-deps-windows-${{ steps.vars.outputs.version }}.zip
+        Get-ChildItem -Force | Compress-Archive -DestinationPath ../elcap-deps-windows-${{ steps.vars.outputs.version }}.zip
         cd ..
       shell: pwsh
 
